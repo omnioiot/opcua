@@ -30,7 +30,7 @@ http = ["actix-web"]
 vendored-openssl = ["opcua-core/vendored-openssl", "opcua-client/vendored-openssl"]
 
 [dependencies]
-log = "0.4"
+log = { version = "0.4", features = ["max_level_off"] }
 time = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0"
