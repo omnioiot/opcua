@@ -65,15 +65,17 @@ fn main() -> Result<(), ()> {
         .unwrap();
 
     println!("Connecting to endpoint {}", args.url);
-    let session = client.connect_to_endpoint(
-        (
-            args.url.as_ref(),
-            SecurityPolicy::None.to_str(),
-            MessageSecurityMode::None,
-            UserTokenPolicy::anonymous(),
-        ),
-        IdentityToken::Anonymous,
-    ).unwrap();
+    let session = client
+        .connect_to_endpoint(
+            (
+                args.url.as_ref(),
+                SecurityPolicy::None.to_str(),
+                MessageSecurityMode::None,
+                UserTokenPolicy::anonymous(),
+            ),
+            IdentityToken::Anonymous,
+        )
+        .unwrap();
     println!("Connected");
 
     let root_id = ObjectId::RootFolder.into();
@@ -83,16 +85,21 @@ fn main() -> Result<(), ()> {
         reference_type_id: ReferenceTypeId::References.into(),
         include_subtypes: true,
         node_class_mask: 0b00000011,
-        result_mask: 0b111111
+        result_mask: 0b111111,
     };
 
     let mut stack = vec![root];
 
     while !stack.is_empty() {
-        let mut reader = session.write().unwrap();
+        let reader = session.write().unwrap();
         let (maybe_reads, new_stack): (Vec<_>, Vec<_>) = stack
             .chunks(10)
-            .flat_map(|chunk| reader.browse(chunk).map_err(|err| { println!("{}", err); err }))
+            .flat_map(|chunk| {
+                reader.browse(chunk).map_err(|err| {
+                    println!("{}", err);
+                    err
+                })
+            })
             .flatten()
             .flatten()
             .flat_map(|result| {
@@ -144,15 +151,19 @@ fn main() -> Result<(), ()> {
             })
             .unzip();
 
-                let (meta, reads): (Vec<_>, Vec<_>) = maybe_reads
+        let (meta, reads): (Vec<_>, Vec<_>) = maybe_reads
             .into_iter()
             .flatten()
             .map(|(r, name)| ((name, r.node_id.clone()), r))
             .unzip();
 
-        let mut new_values: Vec<_> = reads
+        let new_values: Vec<_> = reads
             .chunks(10)
-            .flat_map(|chunk| reader.read(chunk).map_err(|err| println!("ERR {}", err)))
+            .flat_map(|chunk| {
+                reader
+                    .read(chunk, TimestampsToReturn::Neither, 3000.0)
+                    .map_err(|err| println!("ERR {}", err))
+            })
             .flatten()
             .zip(meta)
             .collect();
@@ -163,4 +174,3 @@ fn main() -> Result<(), ()> {
 
     Ok(())
 }
-
