@@ -7,7 +7,6 @@
 //! 1. Create a client configuration
 //! 2. Connect to an endpoint specified by the url with security None
 //! 3. Subscribe to values and loop forever printing out their values
-use std::sync::{Arc, RwLock};
 
 use opcua_client::prelude::*;
 
@@ -78,98 +77,94 @@ fn main() -> Result<(), ()> {
         .unwrap();
     println!("Connected");
 
-    let root_id = ObjectId::RootFolder.into();
-    let root = BrowseDescription {
+    let root_id: NodeId = ObjectId::ObjectsFolder.into();
+    let root_organizes = BrowseDescription {
+        node_id: root_id.clone(),
+        browse_direction: BrowseDirection::Forward,
+        reference_type_id: ReferenceTypeId::Organizes.into(),
+        include_subtypes: true,
+        node_class_mask: 0b00000011,
+        result_mask: 0b111111,
+    };
+    let root_haschild = BrowseDescription {
         node_id: root_id,
         browse_direction: BrowseDirection::Forward,
-        reference_type_id: ReferenceTypeId::References.into(),
+        reference_type_id: ReferenceTypeId::HasChild.into(),
         include_subtypes: true,
         node_class_mask: 0b00000011,
         result_mask: 0b111111,
     };
 
-    let mut stack = vec![root];
+    let mut stack = vec![root_organizes, root_haschild];
 
-    while !stack.is_empty() {
+    while let Some(next) = stack.pop() {
         let reader = session.write().unwrap();
-        let (maybe_reads, new_stack): (Vec<_>, Vec<_>) = stack
-            .chunks(10)
-            .flat_map(|chunk| {
-                reader.browse(chunk).map_err(|err| {
-                    println!("{}", err);
-                    err
-                })
-            })
-            .flatten()
-            .flatten()
-            .flat_map(|result| {
-                let cp = result.continuation_point;
-                println!(">>> Next result | CONTINUATION POINT {:?}", cp);
-                result.references.into_iter().flatten().map(|reference| {
-                    let node_id = reference.node_id.node_id.clone();
-                    let name = reference.display_name.text;
+        let res = reader.browse(&[next]).unwrap();
+        if let Some(browse_results) = res {
+            //println!(">>> Got browse_result with {} items", browse_results.len());
+            for browse_result in browse_results {
+                if let Some(references) = browse_result.references {
+                    // println!(">>> browse_result has {} references", references.len());
+                    for reference in references {
+                        let node_id = reference.node_id.node_id.clone();
+                        let name = reference.display_name.text;
+                        let node_class = reference.node_class;
 
-                    let is_likely_system_variable =
-                        if let Identifier::String(ref id) = node_id.identifier {
-                            if let Some(s) = id.value() {
-                                s.starts_with('_') || s.contains("._")
-                            } else {
-                                false
-                            }
+                        // Standard folder definition
+                        let is_folder =
+                            reference.type_definition.node_id == ObjectTypeId::FolderType.into();
+
+                        let browse_anyway = is_folder
+                            || reference.type_definition.node_id.namespace != 0
+                                && node_class == NodeClass::Object;
+                        let type_def = reference.type_definition;
+
+                        for _ in 0..stack.len() {
+                            print!("  ");
+                        }
+                        let pre = if node_class == NodeClass::Variable {
+                            "VAR"
                         } else {
-                            true
+                            "DIR"
                         };
+                        println!(
+                            ">>> {} {} ({}) type_def: {}, is_folder = {} browse_anyway = {}",
+                            pre, name, node_id, type_def, is_folder, browse_anyway
+                        );
 
-                    let should_read = reference.node_class == NodeClass::Variable;
-                    if should_read {
-                        println!(">>> Node: {} ({})", name, node_id);
+                        if is_folder {
+                            stack.push(BrowseDescription {
+                                node_id: node_id.clone(),
+                                browse_direction: BrowseDirection::Forward,
+                                reference_type_id: ReferenceTypeId::Organizes.into(),
+                                include_subtypes: true,
+                                node_class_mask: 0b00000011,
+                                result_mask: 0b111111,
+                            });
+                            stack.push(BrowseDescription {
+                                node_id,
+                                browse_direction: BrowseDirection::Forward,
+                                reference_type_id: ReferenceTypeId::HasChild.into(),
+                                include_subtypes: true,
+                                node_class_mask: 0b00000011,
+                                result_mask: 0b111111,
+                            });
+                        }
+
+                        // TODO: If node_class == NodeClass::Variable, go read a sample
+                        // Something like this:
+                        //reader.read(&[
+                        //    ReadValueId {
+                        //        node_id: node_id.clone(),
+                        //        attribute_id: AttributeId::Value as u32,
+                        //        index_range: UAString::null(),
+                        //        data_encoding: QualifiedName::null(),
+                        //    }
+                        //]);
                     }
-
-                    let read = if should_read {
-                        let read = ReadValueId {
-                            node_id: node_id.clone(),
-                            attribute_id: AttributeId::Value as u32,
-                            index_range: UAString::null(),
-                            data_encoding: QualifiedName::null(),
-                        };
-                        Some((read, name))
-                    } else {
-                        None
-                    };
-
-                    let browse = BrowseDescription {
-                        node_id,
-                        browse_direction: BrowseDirection::Forward,
-                        reference_type_id: ReferenceTypeId::References.into(),
-                        include_subtypes: true,
-                        node_class_mask: 0b00000011,
-                        result_mask: 0b111111,
-                    };
-
-                    (read, browse)
-                })
-            })
-            .unzip();
-
-        let (meta, reads): (Vec<_>, Vec<_>) = maybe_reads
-            .into_iter()
-            .flatten()
-            .map(|(r, name)| ((name, r.node_id.clone()), r))
-            .unzip();
-
-        let new_values: Vec<_> = reads
-            .chunks(10)
-            .flat_map(|chunk| {
-                reader
-                    .read(chunk, TimestampsToReturn::Neither, 3000.0)
-                    .map_err(|err| println!("ERR {}", err))
-            })
-            .flatten()
-            .zip(meta)
-            .collect();
-
-        //println!(">>> Values {:?}", new_values);
-        stack = new_stack;
+                }
+            }
+        }
     }
 
     Ok(())
