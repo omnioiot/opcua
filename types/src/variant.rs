@@ -151,6 +151,7 @@ pub enum VariantTypeId {
     ExpandedNodeId,
     ExtensionObject,
     Array,
+    Unsupported,
 }
 
 impl TryFrom<&NodeId> for VariantTypeId {
@@ -236,6 +237,7 @@ impl VariantTypeId {
             VariantTypeId::ExpandedNodeId => EncodingMask::EXPANDED_NODE_ID,
             VariantTypeId::ExtensionObject => EncodingMask::EXTENSION_OBJECT,
             VariantTypeId::Array => panic!("Type of array is unknown"),
+            VariantTypeId::Unsupported => 0u8,
         }
     }
 
@@ -264,7 +266,10 @@ impl VariantTypeId {
             EncodingMask::NODE_ID => VariantTypeId::NodeId,
             EncodingMask::EXPANDED_NODE_ID => VariantTypeId::ExpandedNodeId,
             EncodingMask::EXTENSION_OBJECT => VariantTypeId::ExtensionObject,
-            _ => panic!("Unrecognized encoding mask"),
+            _ => {
+                println!("Unsupported encoding mask: {}", encoding_mask);
+                VariantTypeId::Unsupported
+            }
         }
     }
 

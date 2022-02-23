@@ -113,7 +113,7 @@ mod subscription_state;
 mod builder;
 mod callbacks;
 mod client;
-mod config;
+pub mod config;
 mod session;
 mod session_retry_policy;
 

@@ -52,6 +52,7 @@ impl Array {
             VariantTypeId::Array | VariantTypeId::Empty => {
                 panic!("Invalid array type supplied")
             }
+            VariantTypeId::Unsupported => return,
             _ => {}
         }
         // If the values exist, then validate them to the type
