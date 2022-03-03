@@ -111,7 +111,7 @@ impl Server {
 
         let diagnostics = Arc::new(RwLock::new(ServerDiagnostics::default()));
         let min_publishing_interval_ms = config.limits.min_publishing_interval * 1000.0;
-        let min_sampling_interval_ms = config.limits.min_sampling_interval * 1000.0;
+        let min_sampling_interval_ms = 50.0; //config.limits.min_sampling_interval * 1000.0;
 
         // TODO max string, byte string and array lengths
 
