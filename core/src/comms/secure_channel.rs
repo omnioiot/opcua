@@ -286,6 +286,9 @@ impl SecureChannel {
         if let Some(ref remote_nonce) = remote_nonce.value {
             self.remote_nonce = remote_nonce.to_vec();
             Ok(())
+        } else if remote_nonce.is_null() {
+            self.remote_nonce = vec![0].into();
+            Ok(())
         } else {
             error!("Remote nonce is invalid {:?}", remote_nonce);
             Err(StatusCode::BadNonceInvalid)
