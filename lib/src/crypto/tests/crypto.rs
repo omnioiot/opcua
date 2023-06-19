@@ -1,23 +1,20 @@
 use std::fs::File;
 use std::io::Write;
 
-use crate::{
-    crypto::{
-        aeskey::AesKey,
-        certificate_store::*,
-        hash,
-        pkey::{KeySize, PrivateKey, RsaPadding},
-        random,
-        tests::{
-            make_certificate_store, make_test_cert_1024, make_test_cert_2048, APPLICATION_HOSTNAME,
-            APPLICATION_URI,
-        },
-        user_identity::{legacy_password_decrypt, legacy_password_encrypt},
-        x509::{X509Data, X509},
-        SecurityPolicy, SHA1_SIZE, SHA256_SIZE,
-    },
-    from_hex,
-    types::status_code::StatusCode,
+use crate::types::status_code::StatusCode;
+
+use crate::crypto::tests::{
+    make_certificate_store, make_test_cert_1024, make_test_cert_2048, APPLICATION_HOSTNAME,
+    APPLICATION_URI,
+};
+use crate::crypto::{
+    aeskey::AesKey,
+    certificate_store::*,
+    pkey::{KeySize, PrivateKey, RsaPadding},
+    random,
+    user_identity::{legacy_password_decrypt, legacy_password_encrypt},
+    x509::{X509Data, X509},
+    SecurityPolicy, SHA1_SIZE, SHA256_SIZE,
 };
 
 #[test]
@@ -393,13 +390,15 @@ fn sign_hmac_sha1() {
 
     let mut signature = [0u8; SHA1_SIZE];
     assert!(hash::hmac_sha1(key, data, &mut signature).is_ok());
-    let expected = from_hex("fbdb1d1b18aa6c08324b7d64b71fb76370690e1d");
+    let expected = hex::decode("fbdb1d1b18aa6c08324b7d64b71fb76370690e1d")
+        .unwrap();
     assert_eq!(&signature, &expected[..]);
 
     let key = b"key";
     let data = b"The quick brown fox jumps over the lazy dog";
     assert!(hash::hmac_sha1(key, data, &mut signature).is_ok());
-    let expected = from_hex("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9");
+    let expected = hex::decode("de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9")
+        .unwrap();
     assert_eq!(&signature, &expected[..]);
 
     assert!(hash::verify_hmac_sha1(key, data, &expected));
@@ -408,6 +407,8 @@ fn sign_hmac_sha1() {
 
 #[test]
 fn sign_hmac_sha256() {
+    use crate::crypto::hash;
+
     let key = b"";
     let data = b"";
 
@@ -416,13 +417,17 @@ fn sign_hmac_sha256() {
 
     let mut signature = [0u8; SHA256_SIZE];
     assert!(hash::hmac_sha256(key, data, &mut signature).is_ok());
-    let expected = from_hex("b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad");
+    let expected = hex::decode(
+            "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad"
+        ).unwrap();
     assert_eq!(&signature, &expected[..]);
 
     let key = b"key";
     let data = b"The quick brown fox jumps over the lazy dog";
     assert!(hash::hmac_sha256(key, data, &mut signature).is_ok());
-    let expected = from_hex("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
+    let expected = hex::decode(
+            "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+        ).unwrap();
     assert_eq!(&signature, &expected[..]);
 
     assert!(hash::verify_hmac_sha256(key, data, &expected));
