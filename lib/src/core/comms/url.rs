@@ -39,8 +39,10 @@ pub fn url_matches_except_host(url1: &str, url2: &str) -> bool {
         if let Ok(mut url2) = opc_url_from_str(url2) {
             // Both hostnames are set to xxxx so the comparison should come out as the same url
             // if they actually match one another.
-            if url1.set_host(Some("xxxx")).is_ok() && url2.set_host(Some("xxxx")).is_ok() {
-                return url1 == url2;
+                if url1.set_host(Some("xxxx")).is_ok() && url2.set_host(Some("xxxx")).is_ok() {
+                    let normalized_url1 = url1.as_str().trim_end_matches('/'); // normalizing urls to remove trailing / for comparison
+                    let normalized_url2 = url2.as_str().trim_end_matches('/');
+                    return normalized_url1 == normalized_url2;
             }
         } else {
             error!("Cannot parse url \"{}\"", url2);
